@@ -1,5 +1,5 @@
 2020.6.8日报
-    商品搜索
+    商品详情
        方案一：thymeleaf页面静态化
              a、创建商品详情的thymeleaf模板
              b、创建RabbitMQ消费者，收到消息后生成静态页面（D:/detail/26774635180.html）
