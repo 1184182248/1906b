@@ -1,0 +1,84 @@
+日报
+    1、swagger：swagger是实现了openapi规范的工具集，用于生产api文档并提供可视化的restful风格的web服务
+        swagger使用
+        		1、pom.xml
+        			springfox-swagger2
+        			springfox-swagger-ui
+        		2、config
+        			@Configuration
+        			@EnableSwagger2
+        			public class SwaggerConfig{
+        				 @Bean
+        				 public Docket getDocket(){....}
+        				 private ApiInfo apiInfo(){....}
+        			}
+        		3、controller、pojo
+        			@Api()：描述controller
+        			@ApiOperation()：描述方法
+        			@ApiImplicitParam()：描述参数
+        			@ApiImplicitParams()：描述多个参数
+        			@APIModel()：描述对象参数
+        			@ApiModelProperty()：描述对象中的属性
+    2、网管服务
+        路由：所有请求都通过网关访问服务的consumer
+            usian-manage-web
+                修改vue.config.js： target: 'http://127.0.0.1:7070
+                修改src/api/base.js
+                     basePrductUrl:"/product_api/backend_item",
+                     baseContentUrl:"/content_api/backend_content",
+                     baseSearchUrl:"/search_api/frontend_search",
+            common_zuul
+                application.yml
+                    zuul:
+                      sensitive-headers: true #全局配置，解决在网关服务中不传递请求头的问题
+                      routes:
+                        usian-item-web:
+                          path: /backend_item/**
+                        usian-content-web:
+                          path: /backend_content/**
+                        usian-search-web:
+                          path: /frontend_search/**
+            usian-portal-web
+                修改 vue.config.js： target: 'http://127.0.0.1:7070',
+                修改src/api/base.js
+                    baseUrl: '/api/frontend_portal',
+                    shopcarBaseUrl: "/shopcar_api/frontend_cart",
+                    searchBaseUrl: "/search_api/frontend_search",
+                    detailBaseUrl: "/detail_api/frontend_detail",
+                    registerBaseUrl: "/register_api/frontend_sso",
+                    payMentBaseUrl:"/payment_api/frontend_order",
+
+        容错：客户端通过zuul无法调用consumer时，使用zuul对consumer进行降级
+            common_zuul
+                com.usian.fallback
+                     //设置响应的头信息
+                     @Override
+                     public HttpHeaders getHeaders() {
+                     HttpHeaders header = new HttpHeaders();
+                     MediaType mt = new MediaType("application","json", Charset.forName("utf-8"));
+                     header.setContentType(mt);
+                      return header;
+                            }
+                      //设置响应体
+                       @Override
+                       public InputStream getBody() throws IOException {
+                            String content = "该服务暂时不可用，请稍后重试";
+                            return new ByteArrayInputStream(content.getBytes());
+                                 }
+        限流：使用令牌桶算法实现zuul对consumer的限流
+            common_zuul
+                com.usian.filter
+                     @Override
+                        public Object run() throws ZuulException {
+                            //是否能从令牌桶中获取到令牌
+                            if (!RATE_LIMIT.tryAcquire()) {
+                                RequestContext requestContext =
+                                        RequestContext.getCurrentContext();
+                                requestContext.setSendZuulResponse(false);
+                                requestContext.setResponseBody(JsonUtils.objectToJson(
+                                    		Result.error("访问太多频繁，请稍后再访问！！！")));
+                                requestContext.getResponse().setContentType("application/json; charset=utf-8");
+                            }
+                            return null;
+                        }
+ 
